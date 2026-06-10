@@ -18,25 +18,28 @@ which are of central importance in quantum mechanics.
 
 ## ii. Key results
 
-Definitions
-- `LinearPMap.regularityDomain` : The set of regular points for a partial linear map `T`.
-    A complex number `z` is a regular point for `T` if there exists `c > 0` such that
-    `c * ‖x‖ ≤ ‖T x - z • x‖` for all `x : T.domain`.
-- `LinearPMap.deficiencySubspace` : For an operator `T` and any complex number `z`,
-    the closed submodule which is orthogonal to the range of `T - z • 1`.
-- `LinearPMap.defectNumber` : The rank of the deficiency subspace as a (possibly infinite) cardinal.
-- `LinearPMap.numericalRange` : For an operator `T`, the set of complex numbers `⟪x, T x⟫_ℂ`
-    as `x` ranges over the unit sphere in `T.domain`.
+Definitions (corresponding to an operator `T : H →ₗ.[ℂ] H`)
+- `LinearPMap.regularityDomain` : The set of regular points. A complex number `z` is a regular
+    point if there exists `c > 0` such that `c * ‖x‖ ≤ ‖T x - z • x‖` for all `x : T.domain`.
+- `LinearPMap.deficiencySubspace` : Given a complex number `z`, the closed submodule which
+    is orthogonal to the range of `T - z • 1`.
+- `LinearPMap.defectNumber` : Given a complex number `z`, the rank of the corresponding
+    deficiency subspace as a (possibly infinite) cardinal.
+- `LinearPMap.numericalRange` : The set of complex numbers `⟪x, T x⟫_ℂ` as `x` ranges over
+    the unit sphere in `T.domain`.
+- `LinearPMap.resolventSet` (`ρ`) : The set of complex numbers `z` for which `T - z • 1`
+    has a continuous (equivalently, bounded) inverse with domain all of `H`.
 
 Main results
 - `regularityDomain_isOpen` : The regularity domain is an open subset of `ℂ`.
 - `closure_range_sub_eq_range_closure_sub` : If `z` is a regular point for a closable operator `T`
     then the closure of `(T - z • 1).range` is `(T.closure - z • 1).range`.
-- `defectNumber_same_of_same_connectedComponent` : The defect number is constant on each connected
-    component of the regularity domain.
-- `compl_closure_numericalRange_le_regularityDomain` : The regularity domain contains the exterior
-    of the numerical range.
+- `defectNumber_const` : The defect number is constant on each connected component
+    of the regularity domain.
+- `compl_closure_numericalRange_subset_regularityDomain` : The regularity domain contains
+    the exterior of the numerical range.
 - `numericalRange_convex` : The Toeplitz-Hausdorff theorem — the numerical range is a convex set.
+- `resolventSet_isOpen` : The resolvent set is an open subset of ℂ.
 
 ## iii. Table of contents
 
@@ -44,6 +47,8 @@ Main results
 - B. Deficiency subspace & defect number
 - C. Numerical range
   - C.1. The Toeplitz-Hausdorff theorem
+- D. Spectrum of a closed operator
+  - D.1. Resolvent set
 
 ## iv. References
 
@@ -63,6 +68,13 @@ open Submodule
 open Metric
 open InnerProductSpace
 open Complex
+open Set
+
+/-- The resolvent, `(T - z • 1)⁻¹`. -/
+abbrev resolvent (T : H →ₗ.[ℂ] H) (z : ℂ) : H →ₗ.[ℂ] H := (T - z • 1).inverse
+
+@[inherit_doc resolvent]
+local notation "𝑅" => resolvent
 
 /-!
 ## A. Regularity domain
@@ -105,9 +117,10 @@ def regularityDomain (T : H →ₗ.[ℂ] H) : Set ℂ := {z : ℂ | ∃ c > 0, I
 lemma regularityDomain_antitone : Antitone (regularityDomain (H := H)) :=
   fun _ _ hle _ ⟨c, hc, h⟩ ↦ ⟨c, hc, isLowerBound_of_left_le hle h⟩
 
-/-- `z` is a regular point for `T` iff `T - z • 1` has a bounded inverse. -/
+/-- `z` is a regular point for `T` iff `T - z • 1` has
+  a continuous (equivalently, bounded) inverse. -/
 lemma mem_regularityDomain_iff {T : H →ₗ.[ℂ] H} {z : ℂ} :
-    z ∈ T.regularityDomain ↔ (T - z • 1).toFun.ker = ⊥ ∧ Continuous (T - z • 1).inverse := by
+    z ∈ T.regularityDomain ↔ (T - z • 1).toFun.ker = ⊥ ∧ Continuous (𝑅 T z) := by
   constructor
   · intro ⟨c, hc, h_bound⟩
     have h_ker : (T - z • 1).toFun.ker = ⊥ := by
@@ -117,7 +130,7 @@ lemma mem_regularityDomain_iff {T : H →ₗ.[ℂ] H} {z : ℂ} :
         specialize h_bound ⟨x, x.2.1⟩
         simp_all [sub_apply]
       · simp_all
-    refine ⟨h_ker, ?_⟩
+    use h_ker
     apply LinearMap.continuous_iff_bounded.mpr
     refine ⟨c⁻¹, inv_pos.mpr hc, fun ⟨x, hx⟩ ↦ ?_⟩
     rw [inverse_domain] at hx
@@ -130,7 +143,7 @@ lemma mem_regularityDomain_iff {T : H →ₗ.[ℂ] H} {z : ℂ} :
     apply (inv_mul_le_iff₀ hc).mpr
     have hx : ↑x ∈ (T - z • 1).domain := by simp [sub_domain]
     specialize h_bound ⟨(T - z • 1) ⟨x, hx⟩, by simp [inverse_domain]⟩
-    rw [toFun_eq_coe, inverse_apply_eq h_ker (x := ⟨x, hx⟩) rfl] at h_bound
+    simp only [toFun_eq_coe, inverse_apply_eq h_ker (x := ⟨x, hx⟩), coe_norm] at h_bound
     simp_all [sub_apply]
 
 /-- The regularity domain of `T` contains open balls with radii controlled by the lower bounds. -/
@@ -222,6 +235,13 @@ def defectNumber (T : H →ₗ.[ℂ] H) (z : ℂ) : Cardinal := Module.rank ℂ 
 lemma defectNumber_eq (T : H →ₗ.[ℂ] H) (z : ℂ) :
     T.defectNumber z = Module.rank ℂ (T.deficiencySubspace z) := rfl
 
+lemma IsClosed.defectNumber_eq_zero_iff [CompleteSpace H]
+    {T : H →ₗ.[ℂ] H} (hT : T.IsClosed) {z : ℂ} (hz : z ∈ T.regularityDomain) :
+    T.defectNumber z = 0 ↔ (T - z • 1).toFun.range = ⊤ := by
+  haveI := hT.sub_range_isClosed hz -- needed for HasOrthogonalProjection
+  rw [← orthogonal_eq_bot_iff, ← rank_eq_zero]
+  exact Iff.rfl
+
 /-- `T` and `T.closure` have the same defect number at points in their regularity domain. -/
 lemma defectNumber_closure [CompleteSpace H]
     {T : H →ₗ.[ℂ] H} {z : ℂ} (hz : z ∈ T.regularityDomain) :
@@ -286,60 +306,65 @@ lemma IsClosable.defectNumber_eq_of_mem_ball [CompleteSpace H] {T : H →ₗ.[�
     exact hz₁ ⟨c, lt_of_le_of_lt dist_nonneg h_ball, h⟩
 
 /-- The defect number is constant on each connected component of the regularity domain. -/
-lemma IsClosable.defectNumber_same_of_same_connectedComponent [CompleteSpace H]
+lemma IsClosable.defectNumber_const [CompleteSpace H]
     {T : H →ₗ.[ℂ] H} (hT : T.IsClosable)
-    {z₁ z₂ : T.regularityDomain} (h : connectedComponent z₁ = connectedComponent z₂) :
+    {z₁ z₂ : ℂ} (hz : z₂ ∈ connectedComponentIn T.regularityDomain z₁) :
     T.defectNumber z₁ = T.defectNumber z₂ := by
-  have h_joined : Joined z₁ z₂ := by
-    haveI := T.regularityDomain_isOpen.locPathConnectedSpace
-    rw [← mem_pathComponent_iff, pathComponent_symm, pathComponent_eq_connectedComponent, ← h]
-    exact mem_connectedComponent
-  let path : Path z₁ z₂ := h_joined.somePath
-  by_contra! hne
-  let a : unitInterval := sSup {r | ∀ r' ≤ r, T.defectNumber (path r') = T.defectNumber z₁}
-  have ha : ∀ r < a, T.defectNumber (path r) = T.defectNumber z₁ := by
-    intro r hr
-    obtain ⟨b, hb, hrb⟩ := lt_sSup_iff.mp hr
-    exact hb r hrb.le
-  let c : ℝ := (path a).prop.choose
-  have hc_pos : 0 < c := (path a).prop.choose_spec.1
-  have hc_bound : IsLowerBound T (path a) c := (path a).prop.choose_spec.2
-  obtain ⟨ε, hε, hε_ball⟩ : ∃ ε > 0, ball a ε ⊆ path ⁻¹' ball (path a) c := by
-    apply Metric.mem_nhds_iff.mp
-    refine (IsOpen.mem_nhds_iff ?_).mpr ?_
-    · exact path.continuous.isOpen_preimage _ isOpen_ball
-    · simp [hc_pos]
-  obtain ⟨b₁, h₁, h₁'⟩ : ∃ b ∈ ball a ε, T.defectNumber (path b) = T.defectNumber z₁ := by
-    rcases le_or_gt ε a with hle | hlt
-    · let r : ℝ := a - ε / 2
-      have hr : 0 ≤ r := by dsimp [r]; linarith
-      have hr' : r < a := sub_lt_self _ (half_pos hε)
-      use ⟨r, hr, by linarith [a.2.2]⟩
-      exact ⟨by simp [dist, r, abs_div, abs_of_nonneg hε.le, hε], ha _ hr'⟩
-    · exact ⟨0, by simp [dist, abs_of_nonneg a.2.1, hlt], by rw [path.source]⟩
-  obtain ⟨b₂, h₂, h₂'⟩ : ∃ b ∈ ball a ε, T.defectNumber (path b) ≠ T.defectNumber z₁ := by
-    by_cases! h₀ : a < 1
-    · by_contra! h'
-      let r : unitInterval :=
-        ⟨min (a + ε / 2) 1, le_inf_iff.mpr ⟨by linarith [a.2.1], zero_le_one⟩, inf_le_right⟩
-      refine not_le_of_gt (a := a) (b := r) ?_ ?_
-      · apply (Set.inclusion_lt_inclusion <| Set.subset_univ _).mp
-        simp [r, hε, h₀]
-      · refine le_sSup_iff.mpr fun _ hub ↦ hub fun b hbr ↦ ?_
-        rcases lt_or_ge b a with hlt | hle
-        · exact ha b hlt
-        · refine h' b ?_
-          apply mem_ball.mpr
-          calc
-            _ = (b : ℝ) - a := by simp [dist, hle]
-            _ ≤ r - a := by simp [hbr]
-            _ = min (ε / 2) (1 - a) := by simp [r, ← min_sub_sub_right]
-            _ < ε := by simp [hε]
-    · have : a = 1 := eq_of_le_of_ge a.2.2 h₀
-      refine ⟨a, mem_ball_self hε, by rw [this, path.target]; exact hne.symm⟩
-  apply h₁' ▸ h₂'
-  rw [← defectNumber_eq_of_mem_ball hT hc_bound (hε_ball h₁)]
-  rw [← defectNumber_eq_of_mem_ball hT hc_bound (hε_ball h₂)]
+  by_cases hz₁ : z₁ ∈ T.regularityDomain
+  · have h_joined : JoinedIn T.regularityDomain z₁ z₂ := by
+      haveI := T.regularityDomain_isOpen.locPathConnectedSpace
+      have hz₂ : z₂ ∈ T.regularityDomain := connectedComponentIn_subset _ _ hz
+      apply (joinedIn_iff_joined hz₁ hz₂).mpr
+      rw [← mem_pathComponent_iff, pathComponent_eq_connectedComponent]
+      exact mem_of_mem_image_val (connectedComponentIn_eq_image hz₁ ▸ hz)
+    let path : Path z₁ z₂ := h_joined.somePath
+    by_contra! hne
+    let a : unitInterval := sSup {r | ∀ r' ≤ r, T.defectNumber (path r') = T.defectNumber z₁}
+    have ha : ∀ r < a, T.defectNumber (path r) = T.defectNumber z₁ := by
+      intro r hr
+      obtain ⟨b, hb, hrb⟩ := lt_sSup_iff.mp hr
+      exact hb r hrb.le
+    let c : ℝ := (h_joined.somePath_mem a).choose
+    have hc_pos : 0 < c := (h_joined.somePath_mem a).choose_spec.1
+    have hc_bound : IsLowerBound T (path a) c := (h_joined.somePath_mem a).choose_spec.2
+    obtain ⟨ε, hε, hε_ball⟩ : ∃ ε > 0, ball a ε ⊆ path ⁻¹' ball (path a) c := by
+      apply Metric.mem_nhds_iff.mp
+      refine (IsOpen.mem_nhds_iff ?_).mpr ?_
+      · exact path.continuous.isOpen_preimage _ isOpen_ball
+      · simp [hc_pos]
+    obtain ⟨b₁, h₁, h₁'⟩ : ∃ b ∈ ball a ε, T.defectNumber (path b) = T.defectNumber z₁ := by
+      rcases le_or_gt ε a with hle | hlt
+      · let r : ℝ := a - ε / 2
+        have hr : 0 ≤ r := by dsimp [r]; linarith
+        have hr' : r < a := sub_lt_self _ (half_pos hε)
+        use ⟨r, hr, by linarith [a.2.2]⟩
+        exact ⟨by simp [dist, r, abs_div, abs_of_nonneg hε.le, hε], ha _ hr'⟩
+      · exact ⟨0, by simp [dist, abs_of_nonneg a.2.1, hlt], by rw [path.source]⟩
+    obtain ⟨b₂, h₂, h₂'⟩ : ∃ b ∈ ball a ε, T.defectNumber (path b) ≠ T.defectNumber z₁ := by
+      by_cases! h₀ : a < 1
+      · by_contra! h'
+        let r : unitInterval :=
+          ⟨min (a + ε / 2) 1, le_inf_iff.mpr ⟨by linarith [a.2.1], zero_le_one⟩, inf_le_right⟩
+        refine not_le_of_gt (a := a) (b := r) ?_ ?_
+        · apply (Set.inclusion_lt_inclusion <| Set.subset_univ _).mp
+          simp [r, hε, h₀]
+        · refine le_sSup_iff.mpr fun _ hub ↦ hub fun b hbr ↦ ?_
+          rcases lt_or_ge b a with hlt | hle
+          · exact ha b hlt
+          · refine h' b ?_
+            apply mem_ball.mpr
+            calc
+              _ = (b : ℝ) - a := by simp [dist, hle]
+              _ ≤ r - a := by simp [hbr]
+              _ = min (ε / 2) (1 - a) := by simp [r, ← min_sub_sub_right]
+              _ < ε := by simp [hε]
+      · have : a = 1 := eq_of_le_of_ge a.2.2 h₀
+        refine ⟨a, mem_ball_self hε, by rw [this, path.target]; exact hne.symm⟩
+    apply h₁' ▸ h₂'
+    rw [← defectNumber_eq_of_mem_ball hT hc_bound (hε_ball h₁)]
+    rw [← defectNumber_eq_of_mem_ball hT hc_bound (hε_ball h₂)]
+  · false_or_by_contra
+    exact (mem_empty_iff_false z₂).mp (connectedComponentIn_eq_empty hz₁ ▸ hz)
 
 /-!
 ## C. Numerical range
@@ -347,7 +372,6 @@ lemma IsClosable.defectNumber_same_of_same_connectedComponent [CompleteSpace H]
 
 section
 
-open Set
 open Pointwise
 
 /-- The set `{⟪x, T x⟫_ℂ | x ∈ T.domain ∧ ‖x‖ = 1} ⊆ ℂ`. -/
@@ -381,8 +405,8 @@ lemma numericalRange_sub_const (T : H →ₗ.[ℂ] H) (c : ℂ) :
     simp_all [← hcz, ← hxz, sub_apply, inner_sub_right, inner_smul_right]
 
 /-- The regularity domain contains the exterior of the numerical range. -/
-lemma compl_closure_numericalRange_le_regularityDomain (T : H →ₗ.[ℂ] H) :
-    (_root_.closure T.numericalRange)ᶜ ≤ T.regularityDomain := by
+lemma compl_closure_numericalRange_subset_regularityDomain (T : H →ₗ.[ℂ] H) :
+    (_root_.closure T.numericalRange)ᶜ ⊆ T.regularityDomain := by
   intro z hz
   by_cases hT : T.domain = ⊥
   · refine ⟨1, zero_lt_one, fun ⟨x, hx⟩ ↦ ?_⟩
@@ -509,6 +533,86 @@ theorem numericalRange_convex (T : H →ₗ.[ℂ] H) : Convex ℝ T.numericalRan
       ring
 
 end
+
+/-!
+## D. Spectrum of a closed operator
+-/
+
+/-!
+### D.1. Resolvent set
+-/
+
+/-- The resolvent set, `ρ`, of a partial linear map.
+
+  A complex number `z` is in `ρ T` iff the linear map `T - z • 1` from `T.domain` to `H`
+  is a bijection with continuous (equivalently, bounded) inverse. -/
+def resolventSet (T : H →ₗ.[ℂ] H) : Set ℂ :=
+  {z : ℂ | (T - z • 1).toFun.ker = ⊥ ∧ (T - z • 1).toFun.range = ⊤ ∧ Continuous (𝑅 T z)}
+
+@[inherit_doc resolventSet]
+local notation "ρ" => resolventSet
+
+lemma resolventSet_eq (T : H →ₗ.[ℂ] H) :
+    ρ T = {z | (T - z • 1).toFun.ker = ⊥ ∧ (T - z • 1).toFun.range = ⊤ ∧ Continuous (𝑅 T z)} :=
+  rfl
+
+lemma mem_resolventSet_iff {T : H →ₗ.[ℂ] H} {z : ℂ} :
+    z ∈ ρ T ↔ (T - z • 1).toFun.ker = ⊥ ∧ (T - z • 1).toFun.range = ⊤ ∧ Continuous (𝑅 T z) :=
+  Iff.rfl
+
+/-- If an operator is not closed then its resolvent set is empty. -/
+lemma resolventSet_eq_empty [CompleteSpace H] {T : H →ₗ.[ℂ] H} (h : ¬T.IsClosed) : ρ T = ∅ := by
+  ext z
+  simp only [mem_empty_iff_false, iff_false]
+  by_contra ⟨h_ker, h_range, h_cont⟩
+  suffices (T - z • 1).IsClosed by
+    have hTz : T - z • 1 + z • 1 = T :=
+      eq_of_le_of_domain_eq (sub_add_le_cancel _ _) (by simp [add_domain, sub_domain])
+    exact h <| hTz ▸ this.add_continuous (Continuous.const_smul (by fun_prop) _) (by simp)
+  apply (inverse_closed_iff h_ker).mp
+  apply (isClosed_iff_isClosed_domain_of_continuous h_cont).mpr
+  simp [inverse_domain, h_range]
+
+lemma resolventSet_subset_regularityDomain (T : H →ₗ.[ℂ] H) : ρ T ⊆ T.regularityDomain :=
+  fun _ ⟨h_ker, _, h_cont⟩ ↦ mem_regularityDomain_iff.mpr ⟨h_ker, h_cont⟩
+
+/-- For a closed operator the continuity of the resolvent is redundant
+  in the definition of the resolvent set. -/
+lemma IsClosed.resolventSet_eq [CompleteSpace H] {T : H →ₗ.[ℂ] H} (hT : T.IsClosed) :
+    ρ T = {z : ℂ | (T - z • 1).toFun.ker = ⊥ ∧ (T - z • 1).toFun.range = ⊤} := by
+  ext z
+  rw [mem_resolventSet_iff, mem_setOf_eq, and_congr_right_iff, and_iff_left_iff_imp]
+  intro h_ker h_range
+  refine continuous_of_isClosed_domain ?_ ?_
+  · apply (inverse_closed_iff h_ker).mpr
+    exact hT.sub_continuous (Continuous.const_smul (by fun_prop) _) (by simp)
+  · simp [inverse_domain, h_range]
+
+/-- For a closed operator the resolvent set consists of those regular points for which
+  the defect number is zero. -/
+lemma IsClosed.resolventSet_eq' [CompleteSpace H] {T : H →ₗ.[ℂ] H} (hT : T.IsClosed) :
+    ρ T = T.regularityDomain ∩ T.defectNumber ⁻¹' {0} := by
+  ext z
+  constructor
+  · intro hρ
+    have hz : z ∈ T.regularityDomain := T.resolventSet_subset_regularityDomain hρ
+    exact ⟨hz, (hT.defectNumber_eq_zero_iff hz).mpr hρ.2.1⟩
+  · intro ⟨h_reg, h_defect⟩
+    obtain ⟨h_ker, h_cont⟩ := mem_regularityDomain_iff.mp h_reg
+    exact ⟨h_ker, (hT.defectNumber_eq_zero_iff h_reg).mp h_defect, h_cont⟩
+
+/-- The resolvent set is an open subset of ℂ. -/
+lemma resolventSet_isOpen [CompleteSpace H] (T : H →ₗ.[ℂ] H) : IsOpen (ρ T) := by
+  by_cases hT : T.IsClosed
+  · rw [hT.resolventSet_eq']
+    apply isOpen_iff_forall_mem_open.mpr
+    intro z₁ hz₁
+    refine ⟨connectedComponentIn T.regularityDomain z₁, fun z₂ hz₂ ↦ ⟨?_, ?_⟩, ?_, ?_⟩
+    · exact connectedComponentIn_subset _ _ hz₂
+    · simp_all [hT.isClosable.defectNumber_const hz₂]
+    · exact T.regularityDomain_isOpen.connectedComponentIn
+    · exact mem_connectedComponentIn hz₁.1
+  · simp [resolventSet_eq_empty hT]
 
 end
 
