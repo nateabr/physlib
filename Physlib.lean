@@ -387,6 +387,8 @@ public import Physlib.SpaceAndTime.Space.Derivatives.MatrixDiv
 public import Physlib.SpaceAndTime.Space.Derivatives.MultiIndex
 public import Physlib.SpaceAndTime.Space.DistConst
 public import Physlib.SpaceAndTime.Space.DistOfFunction
+public import Physlib.SpaceAndTime.Space.EuclideanGroup.AffineGroup
+public import Physlib.SpaceAndTime.Space.EuclideanGroup.Basic
 public import Physlib.SpaceAndTime.Space.Integrals.Basic
 public import Physlib.SpaceAndTime.Space.Integrals.NormPow
 public import Physlib.SpaceAndTime.Space.Integrals.RadialAngularMeasure
