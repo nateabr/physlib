@@ -27,8 +27,8 @@ prove that they satisfy the equation of motion, and prove some properties of the
   - A.1. Definition of the initial conditions
   - A.2. Relation to other types of initial conditions
     - A.2.1. Initial conditions at arbitrary time
-      - A.2.1.1. Conversion to standard initial conditions
     - A.2.2. Initial conditions from two positions at different times
+    - A.2.3. Initial conditions from two velocities at different times
   - A.3. The zero initial conditions
     - A.3.1. Simple results for the zero initial conditions
 - B. Trajectories associated with the initial conditions
@@ -44,6 +44,7 @@ prove that they satisfy the equation of motion, and prove some properties of the
 - D. The energy of the trajectories
   - D.1. Correctness of InitialConditionsAtTime conversion
   - D.2. Correctness of InitialConditionsFromTwoPositions conversion
+  - D.3. Correctness of InitialConditionsFromTwoVelocities conversion
 - E. The trajectories at zero velocity
   - E.1. The times at which the velocity is zero
   - E.2. A time when the velocity is zero
@@ -112,9 +113,10 @@ Currently implemented:
   This is useful for problems where the natural reference time is not zero.
 - **Initial conditions from two positions at different times**: Specify the position at two
   distinct times `t₁` and `t₂` that satisfy the non-degeneracy condition.
+- **Initial conditions from two velocities at different times**: Specify the velocity at two
+  distinct times `t₁` and `t₂` that satisfy the non-degeneracy condition.
 
 Future work (to be added in separate PRs) :
-- Initial conditions from two velocities at different times
 - Amplitude-phase parametrization
 
 All alternative forms can be converted to the standard `InitialConditions` type via conversion
@@ -129,6 +131,16 @@ the original specifications.
 
 We define a type for initial conditions specified at an arbitrary time `t₀`, rather than at `t=0`.
 This is useful when the natural reference point for a problem is not at time zero.
+
+The conversion to the standard `InitialConditions` works by "running the trajectory backward in
+time" from `t₀` to `0`. Given that we know `x(t₀)` and `v(t₀)`, we use the harmonic oscillator
+solution formula with time-reversal to determine what `x(0)` and `v(0)` must have been.
+
+Mathematically, if `x(t) = cos(ωt)·x₀ + (sin(ωt)/ω)·v₀`, then setting `t = t₀`:
+  `x(t₀) = cos(ωt₀)·x₀ + (sin(ωt₀)/ω)·v₀`
+  `v(t₀) = -ω·sin(ωt₀)·x₀ + cos(ωt₀)·v₀`
+
+Solving this linear system for `x₀` and `v₀` gives the formulas in `toInitialConditions` below.
 
 -/
 
@@ -146,24 +158,6 @@ This is useful when the natural reference point for a problem is not at time zer
   x_t₀ : EuclideanSpace ℝ (Fin 1)
   /-- The velocity at time t₀. -/
   v_t₀ : EuclideanSpace ℝ (Fin 1)
-
-/-!
-
-##### A.2.1.1. Conversion to standard initial conditions
-
-We now define the conversion from `InitialConditionsAtTime` to the standard `InitialConditions`.
-
-The conversion works by "running the trajectory backward in time" from `t₀` to `0`.
-Given that we know `x(t₀)` and `v(t₀)`, we use the harmonic oscillator solution formula
-with time-reversal to determine what `x(0)` and `v(0)` must have been.
-
-Mathematically, if `x(t) = cos(ωt)·x₀ + (sin(ωt)/ω)·v₀`, then setting `t = t₀`:
-  `x(t₀) = cos(ωt₀)·x₀ + (sin(ωt₀)/ω)·v₀`
-  `v(t₀) = -ω·sin(ωt₀)·x₀ + cos(ωt₀)·v₀`
-
-Solving this linear system for `x₀` and `v₀` gives the formulas below.
-
--/
 
 namespace InitialConditionsAtTime
 
@@ -184,10 +178,6 @@ noncomputable def toInitialConditions (S : HarmonicOscillator)
 The correctness proofs showing that the conversion produces the expected trajectory
 are given later in section D.1, after the trajectory machinery has been defined.
 -/
-
-TODO "Implement other initial conditions for the classical harmonic oscillator. For example:
-- Two velocities at different times.
-And convert them into the type `InitialConditions` above."
 
 end InitialConditionsAtTime
 
@@ -246,6 +236,60 @@ noncomputable def toInitialConditions (S : HarmonicOscillator)
       - (S.ω * cos (S.ω * IC.t₂) / sin (S.ω * (IC.t₂ - IC.t₁))) • IC.x_t₁
 
 end InitialConditionsFromTwoPositions
+
+/-!
+
+#### A.2.3. Initial conditions from two velocities at different times
+
+We define a type for initial conditions specified by two measured velocities `v_t₁` and `v_t₂`
+at two distinct times `t₁` and `t₂`.
+
+The conversion to the standard `InitialConditions` is obtained by solving for `x₀` and `v₀` the
+two equations given by evaluating the velocity of the trajectory at `t₁` and `t₂`:
+  `v_t₁ = -ω·sin(ωt₁)·x₀ + cos(ωt₁)·v₀`
+  `v_t₂ = -ω·sin(ωt₂)·x₀ + cos(ωt₂)·v₀`
+
+This linear system has determinant `ω·(cos(ωt₁)·sin(ωt₂) - cos(ωt₂)·sin(ωt₁)) = ω·sin(ω(t₂-t₁))`.
+Writing `Δ = sin(ω(t₂-t₁))`, solving the system gives the formulas used below:
+  `x₀ = (cos(ωt₂)·v_t₁ - cos(ωt₁)·v_t₂)/(ω·Δ)`
+  `v₀ = (sin(ωt₂)·v_t₁ - sin(ωt₁)·v_t₂)/Δ`
+
+The conversion is defined as a total function, but it recovers the initial conditions only when
+`Δ = sin(ω(t₂-t₁)) ≠ 0`, i.e. when `t₂ - t₁` is not an integer multiple of half a period. The
+correctness proofs, under this nondegeneracy condition, are given later in section D.3.
+
+-/
+
+/-- Initial conditions for the harmonic oscillator specified by two velocities
+  `v_t₁` and `v_t₂` measured at two times `t₁` and `t₂` respectively.
+
+  The conditions can be converted to the standard `InitialConditions` format
+  using the `toInitialConditions` function. -/
+@[ext] structure InitialConditionsFromTwoVelocities where
+  /-- The first measurement time. -/
+  t₁ : Time
+  /-- The velocity at time `t₁`. -/
+  v_t₁ : EuclideanSpace ℝ (Fin 1)
+  /-- The second measurement time. -/
+  t₂ : Time
+  /-- The velocity at time `t₂`. -/
+  v_t₂ : EuclideanSpace ℝ (Fin 1)
+
+namespace InitialConditionsFromTwoVelocities
+
+/-- Convert two-velocity initial conditions to standard initial conditions at `t = 0`.
+
+  Obtained by solving the 2×2 linear system from the velocity formula at `t₁` and `t₂`.
+  See `toInitialConditions_velocity_at_t₁` and `toInitialConditions_velocity_at_t₂` in
+  section D.3 for the correctness proofs (valid under `sin (S.ω * (t₂ - t₁)) ≠ 0`). -/
+noncomputable def toInitialConditions (S : HarmonicOscillator)
+    (IC : InitialConditionsFromTwoVelocities) : InitialConditions where
+  x₀ := (cos (S.ω * IC.t₂) / (S.ω * sin (S.ω * (IC.t₂ - IC.t₁)))) • IC.v_t₁
+      - (cos (S.ω * IC.t₁) / (S.ω * sin (S.ω * (IC.t₂ - IC.t₁)))) • IC.v_t₂
+  v₀ := (sin (S.ω * IC.t₂) / sin (S.ω * (IC.t₂ - IC.t₁))) • IC.v_t₁
+      - (sin (S.ω * IC.t₁) / sin (S.ω * (IC.t₂ - IC.t₁))) • IC.v_t₂
+
+end InitialConditionsFromTwoVelocities
 
 /-!
 
@@ -457,15 +501,16 @@ lemma trajectory_equationOfMotion (IC : InitialConditions) :
 ### C.1. Uniqueness of the solutions
 
 We show that the trajectories are the unique solutions to the equation of motion
-for the given initial conditions. This is currently a TODO.
+for the given initial conditions.
 
 -/
 /-- The trajectories to the equation of motion for a given set of initial conditions
   are unique.
 
-  Semiformal implementation:
-  - One may needed the added condition of smoothness on `x` here.
-  - `EquationOfMotion` needs defining before this can be proved. -/
+  Given any smooth `x` satisfying the equation of motion with the same initial
+  position and velocity, the difference `y = x - IC.trajectory S` also solves the
+  equation of motion with zero initial conditions; energy conservation then forces
+  its energy, and hence `y`, to vanish identically, so `x = IC.trajectory S`. -/
 lemma trajectories_unique (IC : InitialConditions) (x : Time → EuclideanSpace ℝ (Fin 1))
     (hx : ContDiff ℝ ∞ x) :
     S.EquationOfMotion x ∧ x 0 = IC.x₀ ∧ ∂ₜ x 0 = IC.v₀ →
@@ -758,6 +803,46 @@ lemma toInitialConditions_trajectory_at_t₂ (S : HarmonicOscillator)
   grind [mul_sub, Real.sin_sub]
 
 end InitialConditionsFromTwoPositions
+
+/-!
+
+## D.3. Correctness of InitialConditionsFromTwoVelocities conversion
+
+The conversion recovers the initial conditions only when `sin (S.ω * (t₂ - t₁)) ≠ 0`. Under this
+nondegeneracy condition, we prove that the resulting trajectory has velocity `v_t₁` at `t₁` and
+`v_t₂` at `t₂`.
+
+-/
+
+namespace InitialConditionsFromTwoVelocities
+
+/-- The trajectory from `toInitialConditions` has velocity `v_t₁` at time `t₁`,
+  provided `sin (S.ω * (t₂ - t₁)) ≠ 0`. -/
+lemma toInitialConditions_velocity_at_t₁ (S : HarmonicOscillator)
+    (IC : InitialConditionsFromTwoVelocities)
+    (hΔ : sin (S.ω * (IC.t₂ - IC.t₁)) ≠ 0) :
+    ∂ₜ ((IC.toInitialConditions S).trajectory S) IC.t₁ = IC.v_t₁ := by
+  rw [InitialConditions.trajectory_velocity, toInitialConditions]
+  ext i
+  simp only [neg_smul, PiLp.add_apply, PiLp.neg_apply, PiLp.smul_apply, PiLp.sub_apply,
+    smul_eq_mul]
+  field_simp [S.ω_ne_zero]
+  grind [mul_sub, Real.sin_sub]
+
+/-- The trajectory from `toInitialConditions` has velocity `v_t₂` at time `t₂`,
+  provided `sin (S.ω * (t₂ - t₁)) ≠ 0`. -/
+lemma toInitialConditions_velocity_at_t₂ (S : HarmonicOscillator)
+    (IC : InitialConditionsFromTwoVelocities)
+    (hΔ : sin (S.ω * (IC.t₂ - IC.t₁)) ≠ 0) :
+    ∂ₜ ((IC.toInitialConditions S).trajectory S) IC.t₂ = IC.v_t₂ := by
+  rw [InitialConditions.trajectory_velocity, toInitialConditions]
+  ext i
+  simp only [neg_smul, PiLp.add_apply, PiLp.neg_apply, PiLp.smul_apply, PiLp.sub_apply,
+    smul_eq_mul]
+  field_simp [S.ω_ne_zero]
+  grind [mul_sub, Real.sin_sub]
+
+end InitialConditionsFromTwoVelocities
 
 namespace InitialConditions
 
