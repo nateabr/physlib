@@ -589,7 +589,7 @@ end InitialConditions
 
 /-!
 
-## D.1. Correctness of InitialConditionsAtTime conversion
+### D.1. Correctness of InitialConditionsAtTime conversion
 
 We now prove the correctness lemmas for the `InitialConditionsAtTime.toInitialConditions`
 conversion function. These show that the conversion produces a trajectory that passes through
@@ -648,7 +648,7 @@ end InitialConditionsAtTime
 
 /-!
 
-## D.2. Correctness of InitialConditionsFromTwoPositions conversion
+### D.2. Correctness of InitialConditionsFromTwoPositions conversion
 
 The conversion recovers the initial conditions only when `sin (S.ω * (t₂ - t₁)) ≠ 0`. This
 condition fails exactly when `ω·(t₂ - t₁) = n·π` for some integer `n`, i.e. when `t₂ - t₁` is an
@@ -690,7 +690,7 @@ end InitialConditionsFromTwoPositions
 
 /-!
 
-## D.3. Correctness of InitialConditionsFromTwoVelocities conversion
+### D.3. Correctness of InitialConditionsFromTwoVelocities conversion
 
 The conversion recovers the initial conditions only when `sin (S.ω * (t₂ - t₁)) ≠ 0`. Under this
 nondegeneracy condition, we prove that the resulting trajectory has velocity `v_t₁` at `t₁` and
