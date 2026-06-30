@@ -153,6 +153,17 @@ def generalizedKroneckerDelta {α ι : Type} [DecidableEq α]
     (μ : ι → α) (ν : ι → α) : ℤ :=
   Matrix.det (fun i j => δℤ (μ i) (ν j))
 
+/-- Swapping two of the upper indices of the generalized Kronecker delta negates it.
+This is one row transposition of the underlying determinant. -/
+lemma generalizedKroneckerDelta_swap {α ι : Type} [DecidableEq α] [DecidableEq ι] [Fintype ι]
+    (μ ν : ι → α) {i j : ι} (hij : i ≠ j) :
+    generalizedKroneckerDelta (μ ∘ Equiv.swap i j) ν = - generalizedKroneckerDelta μ ν := by
+  rw [show generalizedKroneckerDelta (μ ∘ Equiv.swap i j) ν
+        = (Matrix.submatrix (fun a b => ((kroneckerDelta (μ a) (ν b) : ℕ) : ℤ))
+            (Equiv.swap i j) id).det from rfl,
+    Matrix.det_permute, Equiv.Perm.sign_swap hij]
+  simp [generalizedKroneckerDelta]
+
 end Generalized
 
 end KroneckerDelta
