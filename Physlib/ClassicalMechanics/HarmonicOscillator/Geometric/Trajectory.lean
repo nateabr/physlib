@@ -67,7 +67,8 @@ abbrev Trajectory := Time → ConfigurationSpace
 namespace Trajectory
 
 /-- The coordinate curve of a trajectory: its reading in the global Euclidean coordinate. -/
-def coord (γ : Trajectory) : Time → EuclideanSpace ℝ (Fin 1) := fun t => (γ t).val
+def coord (γ : Trajectory) : Time → EuclideanSpace ℝ (Fin 1) :=
+  fun t => chartAt (EuclideanSpace ℝ (Fin 1)) (γ t) (γ t)
 
 /-- The physical position of the oscillator along a trajectory, over time. -/
 def toSpace (γ : Trajectory) : Time → Space 1 := fun t => (γ t).toSpace
@@ -86,7 +87,7 @@ spaces, this manifold-smoothness statement then becomes ordinary `ContDiff` smoo
 lemma contMDiff_iff_contDiff_coord {n : WithTop ℕ∞} (γ : Trajectory) :
     ContMDiff 𝓘(ℝ, Time) 𝓘(ℝ, EuclideanSpace ℝ (Fin 1)) n γ ↔
       ContDiff ℝ n (coord γ) := by
-  rw [show coord γ = ConfigurationSpace.valDiffeomorph ∘ γ from rfl]
+  rw [show coord γ = ConfigurationSpace.valDiffeomorph ∘ γ by rfl]
   rw [← contMDiff_iff_contDiff]
   exact (ConfigurationSpace.valDiffeomorph.contMDiff_diffeomorph_comp_iff
     (m := n) (f := γ) le_top).symm
@@ -106,14 +107,15 @@ noncomputable def velocity (γ : Trajectory) (t : Time) :
   mfderiv 𝓘(ℝ, Time) 𝓘(ℝ, EuclideanSpace ℝ (Fin 1)) γ t
     ((1 : Time) : TangentSpace 𝓘(ℝ, Time) t)
 
-/-- A trajectory is `MDifferentiableAt` a time iff its coordinate curve is, since the two
-differ by the coordinate diffeomorphism. -/
-private lemma mdifferentiableAt_iff_coord (γ : Trajectory) (t : Time) :
+/-- A trajectory is `MDifferentiableAt` a time iff its coordinate curve is ordinarily
+differentiable there, since the two differ by the coordinate diffeomorphism. -/
+lemma mdifferentiableAt_iff_differentiableAt_coord (γ : Trajectory) (t : Time) :
     MDifferentiableAt 𝓘(ℝ, Time) 𝓘(ℝ, EuclideanSpace ℝ (Fin 1)) γ t ↔
-      MDifferentiableAt 𝓘(ℝ, Time) 𝓘(ℝ, EuclideanSpace ℝ (Fin 1)) (coord γ) t := by
+      DifferentiableAt ℝ (coord γ) t := by
+  rw [← mdifferentiableAt_iff_differentiableAt]
   constructor
   · intro hγ
-    rw [show coord γ = ConfigurationSpace.valDiffeomorph ∘ γ from rfl]
+    rw [show coord γ = ConfigurationSpace.valDiffeomorph ∘ γ by rfl]
     exact MDifferentiableAt.comp t
       ((ConfigurationSpace.valDiffeomorph.mdifferentiable WithTop.top_ne_zero).mdifferentiableAt)
       hγ
@@ -134,12 +136,16 @@ private lemma mfderiv_eq_mfderiv_coord (γ : Trajectory) (t : Time) :
     mfderiv 𝓘(ℝ, Time) 𝓘(ℝ, EuclideanSpace ℝ (Fin 1)) γ t =
       mfderiv 𝓘(ℝ, Time) 𝓘(ℝ, EuclideanSpace ℝ (Fin 1)) (coord γ) t := by
   by_cases hγ : MDifferentiableAt 𝓘(ℝ, Time) 𝓘(ℝ, EuclideanSpace ℝ (Fin 1)) γ t
-  · simp [mfderiv, coord, writtenInExtChartAt, hγ, (mdifferentiableAt_iff_coord γ t).mp hγ,
+  · have hcoord : MDifferentiableAt 𝓘(ℝ, Time) 𝓘(ℝ, EuclideanSpace ℝ (Fin 1))
+        (coord γ) t :=
+      ((mdifferentiableAt_iff_differentiableAt_coord γ t).mp hγ).mdifferentiableAt
+    simp [mfderiv, coord, writtenInExtChartAt, hγ, hcoord,
       ConfigurationSpace.valHomeomorphism, ConfigurationSpace.valEquiv, Function.comp_def]
     rfl
   · rw [mfderiv_zero_of_not_mdifferentiableAt hγ,
       mfderiv_zero_of_not_mdifferentiableAt
-        (fun h => hγ ((mdifferentiableAt_iff_coord γ t).mpr h))]
+        (fun h => hγ ((mdifferentiableAt_iff_differentiableAt_coord γ t).mpr
+          h.differentiableAt))]
     rfl
 
 /-- In the global coordinate, geometric velocity is represented by the time derivative of the
